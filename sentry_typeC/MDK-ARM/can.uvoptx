@@ -153,17 +153,12 @@
         <Ww>
           <count>0</count>
           <WinNumber>1</WinNumber>
-          <ItemText>measure_ptr</ItemText>
+          <ItemText>sensor_counter,0x0A</ItemText>
         </Ww>
         <Ww>
           <count>1</count>
           <WinNumber>1</WinNumber>
-          <ItemText>measure_ptr</ItemText>
-        </Ww>
-        <Ww>
-          <count>2</count>
-          <WinNumber>1</WinNumber>
-          <ItemText>measure_ptr-&gt;speed_rpm</ItemText>
+          <ItemText>speed</ItemText>
         </Ww>
       </WatchWindow1>
       <Tracepoint>
