@@ -7,8 +7,8 @@ HeaderPath=..\Drivers\STM32F4xx_HAL_Driver\Inc;..\Drivers\STM32F4xx_HAL_Driver\I
 CDefines=USE_HAL_DRIVER;STM32F407xx;USE_HAL_DRIVER;USE_HAL_DRIVER;
 
 [PreviousGenFiles]
-HeaderPath=C:/Users/Jerry/OneDrive - nyu.edu/_coding/temp/robomaster/sentry_shity/Inc
+HeaderPath=C:/Users/Jerry/OneDrive/RM/code/sentry_typeC/Inc
 HeaderFiles=gpio.h;can.h;stm32f4xx_it.h;stm32f4xx_hal_conf.h;main.h;
-SourcePath=C:/Users/Jerry/OneDrive - nyu.edu/_coding/temp/robomaster/sentry_shity/Src
+SourcePath=C:/Users/Jerry/OneDrive/RM/code/sentry_typeC/Src
 SourceFiles=gpio.c;can.c;stm32f4xx_it.c;stm32f4xx_hal_msp.c;main.c;
 

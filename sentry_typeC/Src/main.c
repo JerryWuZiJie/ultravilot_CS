@@ -42,7 +42,7 @@
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
-#define MAX_SPEED 6000  // divide by 9 gets rpm
+#define MAX_SPEED 5000  // divide by 9 gets rpm
 #define REBOUNCE_TIME 1000  // in ms
 #define ROBOT_ID 0  // the id of the motor, 0-3
 #define MAX_CHANGE_TIME 2000  // in ms, decide when to change
@@ -50,6 +50,8 @@
 #define RPM_P 1.5  // 1.5 works fine
 #define RPM_I 0.1
 #define RPM_D 0
+// increment of rpm
+#define INC_RPM 50
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
@@ -60,17 +62,13 @@ PID_TypeDef motor_pid[4];
 
 // speed of motor in rpm
 float speed;
-// randomly change speed
+// count random time
 uint16_t random_timer;
 // randomly change direction
 int8_t direction;
-// counter
-uint16_t counter = 0;
 // counter for sensor turning
 uint16_t sensor_counter = 0;
 
-// speed store before sensor
-float temp_speed;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -150,9 +148,6 @@ int main(void)
 	// set random timer
 	random_timer = MAX_CHANGE_TIME/10 * (float)(rand()%50 + 50)/100;  // ticks every 10 ms
 	
-	// temp speed equal to speed
-	temp_speed = speed;
-	
   
   while (1)
   {
@@ -167,33 +162,34 @@ int main(void)
 			HAL_GPIO_WritePin(LED_G_GPIO_Port,LED_G_Pin, (GPIO_PinState)0);
 			HAL_GPIO_WritePin(LED_B_GPIO_Port,LED_B_Pin, (GPIO_PinState)0);
 			
-			if (sensor_counter == 0){
-				// set motor speed back to temp speed when sensor return finished
-				speed = temp_speed;
-				
-			// set led white
-			HAL_GPIO_WritePin(LED_R_GPIO_Port,LED_R_Pin, (GPIO_PinState)1);
-			HAL_GPIO_WritePin(LED_G_GPIO_Port,LED_G_Pin, (GPIO_PinState)1);
-			HAL_GPIO_WritePin(LED_B_GPIO_Port,LED_B_Pin, (GPIO_PinState)1);
+			if (sensor_counter == 0){				
+				// set led white when in random state
+				HAL_GPIO_WritePin(LED_R_GPIO_Port,LED_R_Pin, (GPIO_PinState)1);
+				HAL_GPIO_WritePin(LED_G_GPIO_Port,LED_G_Pin, (GPIO_PinState)1);
+				HAL_GPIO_WritePin(LED_B_GPIO_Port,LED_B_Pin, (GPIO_PinState)1);
 			}
 		}
 		// update counter if not in sensor fall back
-		else if (counter >= random_timer){
-			counter = 0;
+		else if (!random_timer){
 			// set random speed
 			srand((uint32_t)(HAL_GetTick()));
 			int8_t direction = rand()%2;
 			if (!direction){
 				direction = -1;
 			}
+			
+			float prev_speed = speed;
 			speed = MAX_SPEED * (float)(rand()%50 + 50)/100 * direction;  // 50% to 100% * random direction
+			
+			// transit the speed
+			smooth_transition(prev_speed, speed);
 			
 			// randomly change speed
 			random_timer = MAX_CHANGE_TIME/10 * (float)(rand()%50 + 50)/100;  // ticks every 10 ms
 		}
 		else{			
 			// inc counter
-			counter++;
+			--random_timer;
 		}
 		
 		
@@ -215,47 +211,56 @@ int main(void)
 		
 		//left sensor
 		else if (HAL_GPIO_ReadPin(RIGHT_SENSOR_GPIO_Port, RIGHT_SENSOR_Pin)){
-			
-			// set led green as indicator
-			HAL_GPIO_WritePin(LED_R_GPIO_Port,LED_R_Pin, (GPIO_PinState)0);
-			HAL_GPIO_WritePin(LED_G_GPIO_Port,LED_G_Pin, (GPIO_PinState)1);
-			HAL_GPIO_WritePin(LED_B_GPIO_Port,LED_B_Pin, (GPIO_PinState)0);
-			
-			// move right
-			// store previous speed
-			temp_speed = speed;
-			// smooth transition TODO: for other sensor and counter loop
-			smooth_transition(speed, MAX_SPEED);
-			speed = MAX_SPEED;
-			
-//			// still need to send speed otherwise will stop
-//			speed = MAX_SPEED;
-//			motor_pid[ROBOT_ID].target = speed;
-//			motor_pid[ROBOT_ID].f_cal_pid(&motor_pid[ROBOT_ID],get_chassis_motor_measure_point(ROBOT_ID)->speed_rpm);    //把第二个参数改成读取的速度?
-//			CAN_cmd_chassis(motor_pid[ROBOT_ID].output, motor_pid[ROBOT_ID].output, motor_pid[ROBOT_ID].output, motor_pid[ROBOT_ID].output);
-			
-			// delay for a while to go the other direction
-			sensor_counter = REBOUNCE_TIME/10;
+			HAL_Delay(20);  // eliminate pulse
+			if (HAL_GPIO_ReadPin(RIGHT_SENSOR_GPIO_Port, RIGHT_SENSOR_Pin)){
+				// set led green as indicator
+				HAL_GPIO_WritePin(LED_R_GPIO_Port,LED_R_Pin, (GPIO_PinState)0);
+				HAL_GPIO_WritePin(LED_G_GPIO_Port,LED_G_Pin, (GPIO_PinState)1);
+				HAL_GPIO_WritePin(LED_B_GPIO_Port,LED_B_Pin, (GPIO_PinState)0);
+				
+				// move right
+				// update random speed when exit the move right
+				random_timer = 0;
+				// smooth transition TODO: for other sensor and counter loop
+				smooth_transition(speed, MAX_SPEED);
+				speed = MAX_SPEED;
+				
+				// still need to send speed otherwise will stop
+				speed = MAX_SPEED;
+				motor_pid[ROBOT_ID].target = speed;
+				motor_pid[ROBOT_ID].f_cal_pid(&motor_pid[ROBOT_ID],get_chassis_motor_measure_point(ROBOT_ID)->speed_rpm);
+				CAN_cmd_chassis(motor_pid[ROBOT_ID].output, motor_pid[ROBOT_ID].output, motor_pid[ROBOT_ID].output, motor_pid[ROBOT_ID].output);
+				
+				// delay for a while to go the other direction
+				sensor_counter = REBOUNCE_TIME/10;
+			}
 		}
 		
 		// right sensor
 		else if (HAL_GPIO_ReadPin(LEFT_SENSOR_GPIO_Port, LEFT_SENSOR_Pin)){
-			// move left
-			// pid to control motor speed
-			temp_speed = speed;
-			speed = -MAX_SPEED;
-			motor_pid[ROBOT_ID].target = speed;
-			motor_pid[ROBOT_ID].f_cal_pid(&motor_pid[ROBOT_ID],get_chassis_motor_measure_point(ROBOT_ID)->speed_rpm);
-			CAN_cmd_chassis(motor_pid[ROBOT_ID].output, motor_pid[ROBOT_ID].output, motor_pid[ROBOT_ID].output, motor_pid[ROBOT_ID].output);
-			
-			
-			// set led blue as indicator
-			HAL_GPIO_WritePin(LED_R_GPIO_Port,LED_R_Pin, (GPIO_PinState)0);
-			HAL_GPIO_WritePin(LED_G_GPIO_Port,LED_G_Pin, (GPIO_PinState)0);
-			HAL_GPIO_WritePin(LED_B_GPIO_Port,LED_B_Pin, (GPIO_PinState)1);
-			
-			// delay for a while to go the other direction
-			sensor_counter = REBOUNCE_TIME/10;
+			HAL_Delay(20);  // eliminate pulse
+			if (HAL_GPIO_ReadPin(LEFT_SENSOR_GPIO_Port, LEFT_SENSOR_Pin)){
+				// set led blue as indicator
+				HAL_GPIO_WritePin(LED_R_GPIO_Port,LED_R_Pin, (GPIO_PinState)0);
+				HAL_GPIO_WritePin(LED_G_GPIO_Port,LED_G_Pin, (GPIO_PinState)0);
+				HAL_GPIO_WritePin(LED_B_GPIO_Port,LED_B_Pin, (GPIO_PinState)1);
+				
+				// move left
+				// update random speed when exit the move right
+				random_timer = 0;
+				// smooth transition TODO: for other sensor and counter loop
+				smooth_transition(speed, -MAX_SPEED);
+				speed = -MAX_SPEED;
+				
+				// set speed
+				speed = -MAX_SPEED;
+				motor_pid[ROBOT_ID].target = speed;
+				motor_pid[ROBOT_ID].f_cal_pid(&motor_pid[ROBOT_ID],get_chassis_motor_measure_point(ROBOT_ID)->speed_rpm);
+				CAN_cmd_chassis(motor_pid[ROBOT_ID].output, motor_pid[ROBOT_ID].output, motor_pid[ROBOT_ID].output, motor_pid[ROBOT_ID].output);
+				
+				// delay for a while to go the other direction
+				sensor_counter = REBOUNCE_TIME/10;
+			}
 		}
 		
 		else{
@@ -323,17 +328,26 @@ void SystemClock_Config(void)
 /* USER CODE BEGIN 4 */
 void smooth_transition(float pre_speed, float set_speed){
 	// one transition took 500ms, transform from previous speed to set speed
-	int16_t inc = (set_speed - pre_speed)/50;
-	if (inc < 10){
-		// speed almost no difference, return immediately
-		return;
+	int16_t inc = (set_speed - pre_speed)/INC_RPM;
+	
+	// if inc == 0, then no need to transition
+	if (inc > 0){
+		for(size_t i = 0; i < inc; ++i){
+			HAL_Delay(5);
+			// cal pid and send to motor
+			motor_pid[ROBOT_ID].target = pre_speed + INC_RPM * i;
+			motor_pid[ROBOT_ID].f_cal_pid(&motor_pid[ROBOT_ID],get_chassis_motor_measure_point(ROBOT_ID)->speed_rpm);
+			CAN_cmd_chassis(motor_pid[ROBOT_ID].output, motor_pid[ROBOT_ID].output, motor_pid[ROBOT_ID].output, motor_pid[ROBOT_ID].output);
+		}
 	}
-	for(size_t i = 0; i < 50; ++i){
-		HAL_Delay(10);
-		// cal pid and send to motor
-		motor_pid[ROBOT_ID].target = pre_speed + inc * i;
-		motor_pid[ROBOT_ID].f_cal_pid(&motor_pid[ROBOT_ID],get_chassis_motor_measure_point(ROBOT_ID)->speed_rpm);    //把第二个参数改成读取的速度?
-		CAN_cmd_chassis(motor_pid[ROBOT_ID].output, motor_pid[ROBOT_ID].output, motor_pid[ROBOT_ID].output, motor_pid[ROBOT_ID].output);
+	else if (inc < 0){
+		for(size_t i = 0; i < -inc; ++i){
+			HAL_Delay(5);
+			// cal pid and send to motor
+			motor_pid[ROBOT_ID].target = pre_speed - INC_RPM * i;
+			motor_pid[ROBOT_ID].f_cal_pid(&motor_pid[ROBOT_ID],get_chassis_motor_measure_point(ROBOT_ID)->speed_rpm);
+			CAN_cmd_chassis(motor_pid[ROBOT_ID].output, motor_pid[ROBOT_ID].output, motor_pid[ROBOT_ID].output, motor_pid[ROBOT_ID].output);
+		}
 	}
 }
 /* USER CODE END 4 */
