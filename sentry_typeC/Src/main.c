@@ -42,16 +42,20 @@
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
-#define MAX_SPEED 5000  // divide by 9 gets rpm
+#define MAX_SPEED 3000  // divide by 9 gets rpm
 #define REBOUNCE_TIME 1000  // in ms
 #define ROBOT_ID 0  // the id of the motor, 0-3
-#define MAX_CHANGE_TIME 2000  // in ms, decide when to change
+#define MAX_CHANGE_TIME 2000  // in ms, decide when to change TODO: make this bigger
 // pid for motor, p small so smooth control
 #define RPM_P 1.5  // 1.5 works fine
 #define RPM_I 0.1
 #define RPM_D 0
-// increment of rpm
+// change of rpm per 5ms, smaller transition will be faster but more abrupt (for smooth_transitino)
 #define INC_RPM 50
+// transition time in ms*10 (for transition())
+#define INC_TIME 50
+// to enable transition, 0 for none, 1 for fixed time transition, 2 for smooth transition
+#define TRANSITION 0
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
@@ -76,6 +80,8 @@ void SystemClock_Config(void);
 /* USER CODE BEGIN PFP */
 // make a smooth transition of speed
 void smooth_transition(float pre_speed, float set_speed);
+// with transition but not smooth
+void transition(float pre_speed, float set_speed);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -161,13 +167,6 @@ int main(void)
 			HAL_GPIO_WritePin(LED_R_GPIO_Port,LED_R_Pin, (GPIO_PinState)1);
 			HAL_GPIO_WritePin(LED_G_GPIO_Port,LED_G_Pin, (GPIO_PinState)0);
 			HAL_GPIO_WritePin(LED_B_GPIO_Port,LED_B_Pin, (GPIO_PinState)0);
-			
-			if (sensor_counter == 0){				
-				// set led white when in random state
-				HAL_GPIO_WritePin(LED_R_GPIO_Port,LED_R_Pin, (GPIO_PinState)1);
-				HAL_GPIO_WritePin(LED_G_GPIO_Port,LED_G_Pin, (GPIO_PinState)1);
-				HAL_GPIO_WritePin(LED_B_GPIO_Port,LED_B_Pin, (GPIO_PinState)1);
-			}
 		}
 		// update counter if not in sensor fall back
 		else if (!random_timer){
@@ -182,7 +181,18 @@ int main(void)
 			speed = MAX_SPEED * (float)(rand()%50 + 50)/100 * direction;  // 50% to 100% * random direction
 			
 			// transit the speed
-			smooth_transition(prev_speed, speed);
+			if (TRANSITION == 0){
+				motor_pid[ROBOT_ID].target = speed;
+				motor_pid[ROBOT_ID].f_cal_pid(&motor_pid[ROBOT_ID],get_chassis_motor_measure_point(ROBOT_ID)->speed_rpm);
+				CAN_cmd_chassis(motor_pid[ROBOT_ID].output, motor_pid[ROBOT_ID].output, motor_pid[ROBOT_ID].output, motor_pid[ROBOT_ID].output);
+			 
+			}
+			else if (TRANSITION == 1){
+				transition(prev_speed, speed);
+			}
+			else{
+				smooth_transition(prev_speed, speed);
+			}
 			
 			// randomly change speed
 			random_timer = MAX_CHANGE_TIME/10 * (float)(rand()%50 + 50)/100;  // ticks every 10 ms
@@ -221,9 +231,17 @@ int main(void)
 				// move right
 				// update random speed when exit the move right
 				random_timer = 0;
-				// smooth transition TODO: for other sensor and counter loop
-				smooth_transition(speed, MAX_SPEED);
-				speed = MAX_SPEED;
+				
+				// transit the speed
+				if (TRANSITION == 0){
+					// do nothing, send directly
+				}
+				else if (TRANSITION == 1){
+					transition(speed, MAX_SPEED);
+				}
+				else{
+					smooth_transition(speed, MAX_SPEED);
+				}
 				
 				// still need to send speed otherwise will stop
 				speed = MAX_SPEED;
@@ -248,9 +266,17 @@ int main(void)
 				// move left
 				// update random speed when exit the move right
 				random_timer = 0;
-				// smooth transition TODO: for other sensor and counter loop
-				smooth_transition(speed, -MAX_SPEED);
-				speed = -MAX_SPEED;
+				
+				// transit the speed
+				if (TRANSITION == 0){
+					// do nothing, send directly
+				}
+				else if (TRANSITION == 1){
+					transition(speed, -MAX_SPEED);
+				}
+				else{
+					smooth_transition(speed, -MAX_SPEED);
+				}
 				
 				// set speed
 				speed = -MAX_SPEED;
@@ -264,6 +290,11 @@ int main(void)
 		}
 		
 		else{
+			// set led white when in random state
+			HAL_GPIO_WritePin(LED_R_GPIO_Port,LED_R_Pin, (GPIO_PinState)1);
+			HAL_GPIO_WritePin(LED_G_GPIO_Port,LED_G_Pin, (GPIO_PinState)1);
+			HAL_GPIO_WritePin(LED_B_GPIO_Port,LED_B_Pin, (GPIO_PinState)1);
+			
 			// stop motor
 			// pid to control motor speed
 			motor_pid[ROBOT_ID].target = speed;
@@ -348,6 +379,19 @@ void smooth_transition(float pre_speed, float set_speed){
 			motor_pid[ROBOT_ID].f_cal_pid(&motor_pid[ROBOT_ID],get_chassis_motor_measure_point(ROBOT_ID)->speed_rpm);
 			CAN_cmd_chassis(motor_pid[ROBOT_ID].output, motor_pid[ROBOT_ID].output, motor_pid[ROBOT_ID].output, motor_pid[ROBOT_ID].output);
 		}
+	}
+}
+
+void transition(float pre_speed, float set_speed){
+	// TODO: change to a better transition
+	// one transition took 500ms, transform from previous speed to set speed
+	int16_t inc = (set_speed - pre_speed)/INC_TIME;
+	for(size_t i = 0; i < INC_TIME; ++i){
+		HAL_Delay(10);
+		// cal pid and send to motor
+		motor_pid[ROBOT_ID].target = pre_speed + inc * i;
+		motor_pid[ROBOT_ID].f_cal_pid(&motor_pid[ROBOT_ID],get_chassis_motor_measure_point(ROBOT_ID)->speed_rpm);
+		CAN_cmd_chassis(motor_pid[ROBOT_ID].output, motor_pid[ROBOT_ID].output, motor_pid[ROBOT_ID].output, motor_pid[ROBOT_ID].output);
 	}
 }
 /* USER CODE END 4 */

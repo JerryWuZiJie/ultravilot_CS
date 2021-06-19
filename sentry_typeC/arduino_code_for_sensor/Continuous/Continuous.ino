@@ -9,7 +9,7 @@
 #define leftPin A0
 #define rightPin A1
 #define model 1080
-#define DETECT_DISTANCE 20
+#define DETECT_DISTANCE 40
 
 int distance_left;
 int distance_right;
@@ -23,15 +23,20 @@ void setup()
 {
   Serial.begin(9600);
   pinMode(13, OUTPUT);
+  digitalWrite(13, 0);
   pinMode(12, OUTPUT);
 
 }
 
 void loop()
 {
-  distance_left = leftSensor.distance();
-  distance_right = rightSensor.distance();
-  //  Serial.println(distance_left);
+    distance_left = leftSensor.distance();
+    distance_right = rightSensor.distance();
+//    Serial.print("left: ");
+//      Serial.println(distance_left);
+//      Serial.print("right");
+//      Serial.println(distance_right);
+//      delay(50);
   if (distance_left < DETECT_DISTANCE) {
     Serial.print("left: ");
     Serial.println(distance_left);
@@ -47,5 +52,5 @@ void loop()
   } else {
     digitalWrite(12, LOW);
   }
-//  delay(50);  # no delay needed, process in real time
+//  delay(50);
 }

@@ -54,8 +54,8 @@
 #define MOTOR_ECD_TO_ANGLE          0.000021305288720633905968306772076277f
 #define FULL_COUNT                  18
 //²¦µ¯ËÙ¶È
-#define TRIGGER_SPEED               10.0f
-#define CONTINUE_TRIGGER_SPEED      5.0f  // 15
+#define TRIGGER_SPEED               5.0f
+#define CONTINUE_TRIGGER_SPEED      2.5f  // 15
 #define READY_TRIGGER_SPEED         0.0f  // 5
 
 #define KEY_OFF_JUGUE_TIME          500
