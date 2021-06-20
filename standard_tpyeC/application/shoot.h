@@ -43,7 +43,7 @@
 //鼠标长按判断
 #define PRESS_LONG_TIME             400
 //遥控器射击开关打下档一段时间后 连续发射子弹 用于清单
-#define RC_S_LONG_TIME              2000
+#define RC_S_LONG_TIME              10  // jerry: 2000
 //摩擦轮高速 加速 时间
 #define UP_ADD_TIME                 80
 //电机反馈码盘值范围
@@ -55,8 +55,8 @@
 #define FULL_COUNT                  18
 //拨弹速度
 #define TRIGGER_SPEED               5.0f
-#define CONTINUE_TRIGGER_SPEED      2.5f  // 15
-#define READY_TRIGGER_SPEED         0.0f  // 5
+#define CONTINUE_TRIGGER_SPEED      4.0f  // jerry 15
+#define READY_TRIGGER_SPEED         0.0f  // jerry 5
 
 #define KEY_OFF_JUGUE_TIME          500
 #define SWITCH_TRIGGER_ON           0

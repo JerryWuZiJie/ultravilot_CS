@@ -9,7 +9,7 @@
 #define leftPin A0
 #define rightPin A1
 #define model 1080
-#define DETECT_DISTANCE 40
+#define DETECT_DISTANCE 50
 
 int distance_left;
 int distance_right;

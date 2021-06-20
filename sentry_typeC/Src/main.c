@@ -42,7 +42,7 @@
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
-#define MAX_SPEED 3000  // divide by 9 gets rpm
+#define MAX_SPEED 5000  // divide by 9 gets rpm  // 3000 before
 #define REBOUNCE_TIME 1000  // in ms
 #define ROBOT_ID 0  // the id of the motor, 0-3
 #define MAX_CHANGE_TIME 2000  // in ms, decide when to change TODO: make this bigger
@@ -152,8 +152,7 @@ int main(void)
 	speed = MAX_SPEED * (float)(rand()%50 + 50)/100 * direction;  // 50% to 100% * random direction
 	
 	// set random timer
-	random_timer = MAX_CHANGE_TIME/10 * (float)(rand()%50 + 50)/100;  // ticks every 10 ms
-	
+	random_timer = MAX_CHANGE_TIME/10 * (float)(rand()%80 + 20)/100;  // ticks every 10 ms
   
   while (1)
   {
@@ -178,7 +177,7 @@ int main(void)
 			}
 			
 			float prev_speed = speed;
-			speed = MAX_SPEED * (float)(rand()%50 + 50)/100 * direction;  // 50% to 100% * random direction
+			speed = MAX_SPEED * (float)(rand()%80 + 20)/100 * direction;  // 50% to 100% * random direction
 			
 			// transit the speed
 			if (TRANSITION == 0){
@@ -386,10 +385,14 @@ void transition(float pre_speed, float set_speed){
 	// TODO: change to a better transition
 	// one transition took 500ms, transform from previous speed to set speed
 	int16_t inc = (set_speed - pre_speed)/INC_TIME;
+	if (inc == 0){
+		return;
+	}
+	
 	for(size_t i = 0; i < INC_TIME; ++i){
 		HAL_Delay(10);
 		// cal pid and send to motor
-		motor_pid[ROBOT_ID].target = pre_speed + inc * i;
+		motor_pid[ROBOT_ID].target = pre_speed + (float)inc * i;
 		motor_pid[ROBOT_ID].f_cal_pid(&motor_pid[ROBOT_ID],get_chassis_motor_measure_point(ROBOT_ID)->speed_rpm);
 		CAN_cmd_chassis(motor_pid[ROBOT_ID].output, motor_pid[ROBOT_ID].output, motor_pid[ROBOT_ID].output, motor_pid[ROBOT_ID].output);
 	}
